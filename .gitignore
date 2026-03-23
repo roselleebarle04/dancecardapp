@@ -46,4 +46,3 @@ htmlcov/
 
 # uv
 .venv/
-uv.lock
