@@ -739,6 +739,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "air" },
+    { name = "airmodel" },
     { name = "bcrypt" },
     { name = "hypercorn" },
     { name = "psycopg", extra = ["binary"] },
@@ -749,6 +750,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "air", specifier = ">=0.47.0" },
+    { name = "airmodel", specifier = ">=0.4.2" },
     { name = "bcrypt", specifier = ">=5.0.0" },
     { name = "hypercorn", specifier = ">=0.18.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.3" },

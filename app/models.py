@@ -1,20 +1,21 @@
-from dataclasses import dataclass
+from airmodel import AirModel, AirField
+from uuid import UUID
 from datetime import datetime
 
-@dataclass
-class User:
-    id: str
+class User(AirModel):
+    id: UUID | None = AirField(default=None, primary_key=True)
     email: str
     name: str
-    bio: str = ""
-    website: str = ""
-    linkedin_url: str = ""
-    qr_token: str = ""
-    created_at: datetime = None
+    bio: str | None = None
+    website: str | None = None
+    linkedin_url: str | None = None
+    qr_token: str
+    password_hash: str
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
-@dataclass
-class DanceCardEntry:
-    id: str
-    owner_id: str
-    scanner_id: str
-    created_at: datetime = None
+class DanceCardEntry(AirModel):
+    id: UUID | None = AirField(default=None, primary_key=True)
+    owner_id: UUID
+    scanner_id: UUID
+    created_at: datetime | None = None
