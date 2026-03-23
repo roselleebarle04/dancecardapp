@@ -21,7 +21,12 @@ app = air.Air(debug=DEBUG)
 from app.models import User, DanceCardEntry
 
 @app.get("/")
-async def landing(request: air.Request):
+async def landing(request: air.Request, session: str = Cookie(None)):
+    user_id = get_user_id_from_session(session, SECRET_KEY) if SECRET_KEY else None
+
+    if user_id:
+        return air.RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
+
     return app.jinja(request, "signup.html")
 
 @app.post("/")
@@ -49,7 +54,12 @@ async def signup(request: air.Request):
         return app.jinja(request, "signup.html", error="Error creating account. Please try again.", status_code=500)
 
 @app.get("/login")
-async def login_page(request: air.Request):
+async def login_page(request: air.Request, session: str = Cookie(None)):
+    user_id = get_user_id_from_session(session, SECRET_KEY) if SECRET_KEY else None
+
+    if user_id:
+        return air.RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
+
     return app.jinja(request, "login.html")
 
 @app.post("/login")
