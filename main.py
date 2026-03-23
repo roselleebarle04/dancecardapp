@@ -1,9 +1,8 @@
 import os
 import secrets
-from fastapi import FastAPI, Request, HTTPException, Cookie
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from contextlib import asynccontextmanager
+from fastapi import Cookie, HTTPException, status
+import air
 from dotenv import load_dotenv
 from app.db import init_db, get_db_connection
 from app.auth import hash_password, verify_password, create_session_cookie
@@ -11,26 +10,24 @@ from app.qrcode_gen import generate_qr_code
 
 load_dotenv()
 
-app = FastAPI()
-
-DATABASE_URL = os.getenv("DATABASE_URL")
+PSYCOPG_URL = os.getenv("DATABASE_URL")
 SECRET_KEY = os.getenv("SECRET_KEY")
 DOMAIN = os.getenv("DOMAIN")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
-templates = Jinja2Templates(directory="templates")
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-@app.on_event("startup")
-async def startup():
+@asynccontextmanager
+async def lifespan(app):
     await init_db()
+    yield
 
-@app.get("/", response_class=HTMLResponse)
-async def landing(request: Request):
-    return templates.TemplateResponse("signup.html", {"request": request})
+app = air.Air(lifespan=lifespan)
+
+@app.get("/")
+async def landing(request: air.Request):
+    return app.jinja(request, "signup.html")
 
 @app.post("/")
-async def signup(request: Request):
+async def signup(request: air.Request):
     form_data = await request.form()
     email = form_data.get("email")
     name = form_data.get("name")
@@ -45,10 +42,7 @@ async def signup(request: Request):
     try:
         cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
         if cursor.fetchone():
-            return templates.TemplateResponse("signup.html", {
-                "request": request,
-                "error": "This email is already registered. Try logging in?"
-            }, status_code=400)
+            return app.jinja(request, "signup.html", error="This email is already registered. Try logging in?", status_code=400)
 
         qr_token = secrets.token_urlsafe(6)[:6].upper()
         password_hash = hash_password(password)
@@ -60,7 +54,7 @@ async def signup(request: Request):
         user_id = cursor.fetchone()[0]
         db.commit()
 
-        response = RedirectResponse(url="/dashboard", status_code=302)
+        response = air.RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
         response.set_cookie(
             "session",
             value=create_session_cookie(str(user_id), SECRET_KEY),
@@ -68,22 +62,19 @@ async def signup(request: Request):
             samesite="Lax"
         )
         return response
-    except Exception as e:
+    except Exception:
         db.rollback()
-        return templates.TemplateResponse("signup.html", {
-            "request": request,
-            "error": "Error creating account. Please try again."
-        }, status_code=500)
+        return app.jinja(request, "signup.html", error="Error creating account. Please try again.", status_code=500)
     finally:
         cursor.close()
         db.close()
 
-@app.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+@app.get("/login")
+async def login_page(request: air.Request):
+    return app.jinja(request, "login.html")
 
 @app.post("/login")
-async def login(request: Request):
+async def login(request: air.Request):
     form_data = await request.form()
     email = form_data.get("email")
     password = form_data.get("password")
@@ -96,13 +87,10 @@ async def login(request: Request):
         result = cursor.fetchone()
 
         if not result or not verify_password(password, result[1]):
-            return templates.TemplateResponse("login.html", {
-                "request": request,
-                "error": "Incorrect email or password."
-            }, status_code=401)
+            return app.jinja(request, "login.html", error="Incorrect email or password.", status_code=401)
 
         user_id = result[0]
-        response = RedirectResponse(url="/dashboard", status_code=302)
+        response = air.RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
         response.set_cookie(
             "session",
             value=create_session_cookie(str(user_id), SECRET_KEY),
@@ -116,14 +104,14 @@ async def login(request: Request):
 
 @app.post("/logout")
 async def logout():
-    response = RedirectResponse(url="/", status_code=302)
+    response = air.RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     response.delete_cookie("session")
     return response
 
-@app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(request: Request, session: str = Cookie(None)):
+@app.get("/dashboard")
+async def dashboard(request: air.Request, session: str = Cookie(None)):
     if not session:
-        return RedirectResponse(url="/login", status_code=302)
+        return air.RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
 
     db = get_db_connection()
     cursor = db.cursor()
@@ -133,7 +121,7 @@ async def dashboard(request: Request, session: str = Cookie(None)):
         user = cursor.fetchone()
 
         if not user:
-            return RedirectResponse(url="/login", status_code=302)
+            return air.RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
 
         user_id, user_name, qr_token = user
 
@@ -148,19 +136,13 @@ async def dashboard(request: Request, session: str = Cookie(None)):
 
         qr_code_url = f"https://{DOMAIN}/s/{qr_token}"
 
-        return templates.TemplateResponse("dashboard.html", {
-            "request": request,
-            "user_name": user_name,
-            "qr_token": qr_token,
-            "qr_code_url": qr_code_url,
-            "connections": connections
-        })
+        return app.jinja(request, "dashboard.html", user_name=user_name, qr_token=qr_token, qr_code_url=qr_code_url, connections=connections)
     finally:
         cursor.close()
         db.close()
 
-@app.get("/s/{token}", response_class=HTMLResponse)
-async def scan_step1(request: Request, token: str):
+@app.get("/s/{token}")
+async def scan_step1(request: air.Request, token: str):
     db = get_db_connection()
     cursor = db.cursor()
 
@@ -169,24 +151,17 @@ async def scan_step1(request: Request, token: str):
         user = cursor.fetchone()
 
         if not user:
-            return templates.TemplateResponse("error.html", {
-                "request": request,
-                "message": "Invalid share link. Try again?"
-            }, status_code=404)
+            return app.jinja(request, "error.html", message="Invalid share link. Try again?", status_code=404)
 
         owner_id, owner_name = user
 
-        return templates.TemplateResponse("scan_step1.html", {
-            "request": request,
-            "owner_name": owner_name,
-            "token": token
-        })
+        return app.jinja(request, "scan_step1.html", owner_name=owner_name, token=token)
     finally:
         cursor.close()
         db.close()
 
 @app.post("/s/{token}")
-async def scan_step2(request: Request, token: str):
+async def scan_step2(request: air.Request, token: str):
     form_data = await request.form()
     email = form_data.get("email")
     name = form_data.get("name")
@@ -210,12 +185,7 @@ async def scan_step2(request: Request, token: str):
         existing_user = cursor.fetchone()
 
         if existing_user:
-            return templates.TemplateResponse("scan_step1.html", {
-                "request": request,
-                "owner_name": owner_name,
-                "token": token,
-                "error": "This email is already registered."
-            }, status_code=400)
+            return app.jinja(request, "scan_step1.html", owner_name=owner_name, token=token, error="This email is already registered.", status_code=400)
 
         qr_token = secrets.token_urlsafe(6)[:6].upper()
         password_hash = hash_password(password)
@@ -232,11 +202,7 @@ async def scan_step2(request: Request, token: str):
         )
         db.commit()
 
-        response = templates.TemplateResponse("scan_step3.html", {
-            "request": request,
-            "owner_name": owner_name,
-            "token": token
-        })
+        response = app.jinja(request, "scan_step3.html", owner_name=owner_name, token=token)
         response.set_cookie(
             "session",
             value=create_session_cookie(str(scanner_id), SECRET_KEY),
@@ -244,20 +210,17 @@ async def scan_step2(request: Request, token: str):
             samesite="Lax"
         )
         return response
-    except Exception as e:
+    except Exception:
         db.rollback()
-        return templates.TemplateResponse("scan_step1.html", {
-            "request": request,
-            "error": "Error processing signup."
-        }, status_code=500)
+        return app.jinja(request, "scan_step1.html", error="Error processing signup.", status_code=500)
     finally:
         cursor.close()
         db.close()
 
 @app.post("/s/{token}/add")
-async def scan_step3(request: Request, token: str, session: str = Cookie(None)):
+async def scan_step3(request: air.Request, token: str, session: str = Cookie(None)):
     if not session:
-        return RedirectResponse(url="/", status_code=302)
+        return air.RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
 
     db = get_db_connection()
     cursor = db.cursor()
@@ -280,11 +243,7 @@ async def scan_step3(request: Request, token: str, session: str = Cookie(None)):
             )
             db.commit()
 
-        return RedirectResponse(url="/dashboard", status_code=302)
+        return air.RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
     finally:
         cursor.close()
         db.close()
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)

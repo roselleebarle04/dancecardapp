@@ -1,10 +1,12 @@
 import os
 import psycopg
+from dotenv import load_dotenv
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+load_dotenv()
 
 def get_db_connection():
-    return psycopg.connect(DATABASE_URL, autocommit=False)
+    psycopg_url = os.getenv("PSYCOPG_URL")
+    return psycopg.connect(psycopg_url, autocommit=False)
 
 async def init_db():
     conn = get_db_connection()
