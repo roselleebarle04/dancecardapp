@@ -12,8 +12,9 @@ load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 DOMAIN = os.getenv("RAILWAY_PUBLIC_DOMAIN", "")
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+ENVIRONMENT = os.getenv("RAILWAY_ENVIRONMENT_NAME", "development")
 DEBUG = os.getenv("DEBUG", False)
+PROTO = "https" if DEBUG else "http"
 
 app = air.Air(debug=DEBUG)
 
@@ -97,7 +98,7 @@ async def dashboard(request: air.Request, session: str = Cookie(None)):
             return air.RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
 
         connections = await get_user_connections(user_id)
-        qr_code_url = f"https://{DOMAIN}/s/{user.qr_token}"
+        qr_code_url = f"{PROTO}://{DOMAIN}/s/{user.qr_token}"
 
         return app.jinja(request, "dashboard.html", user_name=user.name, qr_token=user.qr_token, qr_code_url=qr_code_url, connections=connections)
     except Exception:
