@@ -14,6 +14,9 @@ class UserService:
         linkedin_url = form_data.get("linkedin_url", "").strip()
         password = form_data.get("password", "")
 
+        if linkedin_url and not linkedin_url.startswith(("http://", "https://")):
+            linkedin_url = f"https://linkedin.com/in/{linkedin_url}"
+
         qr_token = secrets.token_urlsafe(6)[:6].upper()
         password_hash = hash_password(password)
 
