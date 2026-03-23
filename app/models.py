@@ -1,21 +1,22 @@
 from airmodel import AirModel, AirField
 from uuid import UUID
 from datetime import datetime
+from typing import Optional
 
 class User(AirModel):
-    id: UUID | None = AirField(default=None, primary_key=True)
+    id: Optional[UUID] = AirField(default=None, primary_key=True)
     email: str
     name: str
-    bio: str | None = None
-    website: str | None = None
-    linkedin_url: str | None = None
+    bio: Optional[str] = None
+    website: Optional[str] = None
+    linkedin_url: Optional[str] = None
     qr_token: str
     password_hash: str
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
 class DanceCardEntry(AirModel):
-    id: UUID | None = AirField(default=None, primary_key=True)
+    id: Optional[UUID] = AirField(default=None, primary_key=True)
     owner_id: UUID
     scanner_id: UUID
-    created_at: datetime | None = None
+    created_at: Optional[datetime] = None

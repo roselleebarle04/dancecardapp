@@ -1,7 +1,8 @@
+from typing import Optional
 from uuid import UUID
 from app.models import User, DanceCardEntry
 
-async def get_user_connections(user_id: UUID) -> list[tuple[str, str | None, str | None, str | None]]:
+async def get_user_connections(user_id: UUID) -> list[tuple[str, Optional[str], Optional[str], Optional[str]]]:
     """Fetch all connections for a user with their details."""
     entries = await DanceCardEntry.filter(owner_id=user_id)
     connection_details = []

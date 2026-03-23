@@ -1,5 +1,6 @@
 import os
 import secrets
+from typing import Optional
 from fastapi import Cookie, HTTPException, status
 from uuid import UUID
 import air
@@ -14,7 +15,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 DOMAIN = os.getenv("DOMAIN")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
-def get_user_id_from_session(session: str, secret_key: str) -> UUID | None:
+def get_user_id_from_session(session: str, secret_key: str) -> Optional[UUID]:
     if not session or not secret_key:
         return None
     user_id_str = decode_session_cookie(session, secret_key)

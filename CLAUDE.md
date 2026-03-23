@@ -45,4 +45,5 @@
 
 ## Framework Reference
 
-Complete Air docs: `.claude/AIR_WEB_FRAMEWORK.md`
+- **Air AGENTS.md**: https://github.com/feldroy/Air/blob/main/AGENTS.md
+- **AirModel AGENTS.md**: https://github.com/feldroy/AirModel/blob/main/AGENTS.md
