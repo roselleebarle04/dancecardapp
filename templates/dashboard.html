@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Dance Card{% endblock %}
+
+{% block content %}
+<h1>✨ Welcome, {{ user_name }}! ✨</h1>
+
+<div class="qr-section">
+    <h2>Your QR Code</h2>
+    <p>Share this with others to add them to your dance card:</p>
+    <p style="word-break: break-all; font-size: 0.8em; margin: 15px 0;">{{ qr_code_url }}</p>
+    <p><small>Or scan the QR code below</small></p>
+    <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={{ qr_code_url }}" alt="Your QR Code" class="qr">
+</div>
+
+<div style="margin-top: 30px;">
+    <h3>Your Connections ({{ connections|length }})</h3>
+    {% if connections %}
+        <div class="connections-list">
+            {% for name, bio, website, linkedin in connections %}
+                <div class="connection-item">
+                    <strong>{{ name }}</strong>
+                    {% if bio %}<p style="margin: 5px 0; font-size: 0.9em;">{{ bio }}</p>{% endif %}
+                    <div style="margin-top: 8px; font-size: 0.85em;">
+                        {% if website %}<a href="{{ website }}" target="_blank">🌐 Website</a> {% endif %}
+                        {% if linkedin %}<a href="{{ linkedin }}" target="_blank">💼 LinkedIn</a>{% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p style="margin-top: 20px; color: #999;">No connections yet. Share your QR code to get started!</p>
+    {% endif %}
+</div>
+
+<div style="margin-top: 40px;">
+    <form method="post" action="/logout" style="display: inline;">
+        <button type="submit">Log Out</button>
+    </form>
+</div>
+{% endblock %}

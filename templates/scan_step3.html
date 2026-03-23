@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Success - Dance Card{% endblock %}
+
+{% block content %}
+<h1>✨ Success! ✨</h1>
+<h2>You're connected with {{ owner_name }}!</h2>
+
+<div class="success">
+    <p>Your profile has been created and you've been added to {{ owner_name }}'s dance card.</p>
+</div>
+
+<div style="margin: 30px 0;">
+    <p>You can now:</p>
+    <ul style="list-style: none; padding: 0; text-align: left;">
+        <li style="margin: 10px 0;">✓ View your dashboard</li>
+        <li style="margin: 10px 0;">✓ Share your QR code with others</li>
+        <li style="margin: 10px 0;">✓ Build your network</li>
+    </ul>
+</div>
+
+<a href="/dashboard" style="display: inline-block; background-color: #e94560; color: #fff; padding: 12px 30px; text-decoration: none; font-weight: bold; margin-top: 20px;">
+    Go to Dashboard
+</a>
+
+<div class="link-text">
+    <a href="/">Back to Home</a>
+</div>
+{% endblock %}
