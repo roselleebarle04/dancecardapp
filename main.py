@@ -12,6 +12,7 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 DOMAIN = os.getenv("DOMAIN")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+DEBUG = os.getenv("DEBUG", False)
 
 def get_user_id_from_session(session: str, secret_key: str) -> Optional[int]:
     if not session or not secret_key:
@@ -24,7 +25,7 @@ def get_user_id_from_session(session: str, secret_key: str) -> Optional[int]:
     except (ValueError, TypeError):
         return None
 
-app = air.Air(debug=True)
+app = air.Air(debug=DEBUG)
 
 from app.models import User, DanceCardEntry
 
