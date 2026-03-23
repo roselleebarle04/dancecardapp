@@ -5,7 +5,7 @@ from fastapi import Cookie, HTTPException, status
 import air
 from dotenv import load_dotenv
 from app.auth import hash_password, verify_password, create_session_cookie, decode_session_cookie
-from app.services import get_user_connections
+from app.services import get_user_connections, get_or_create_dance_card_entry
 
 load_dotenv()
 
@@ -128,13 +128,22 @@ async def dashboard(request: air.Request, session: str = Cookie(None)):
         return air.RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
 
 @app.get("/s/{token}")
-async def scan_step1(request: air.Request, token: str):
+async def scan_step1(request: air.Request, token: str, session: str = Cookie(None)):
     try:
         users = await User.filter(qr_token=token)
+
         if not users:
             return app.jinja(request, "error.html", message="Invalid share link. Try again?", status_code=404)
 
         owner = users[0]
+        user_id = get_user_id_from_session(session, SECRET_KEY) if SECRET_KEY else None
+
+        if user_id:
+            entries = await DanceCardEntry.filter(owner_id=owner.id, scanner_id=user_id)
+            if entries:
+                return app.jinja(request, "scan_step4.html", owner_name=owner.name, token=token, owner_id=owner.id)
+            return app.jinja(request, "scan_step3.html", owner_name=owner.name, token=token, is_logged_in=True)
+
         return app.jinja(request, "scan_step1.html", owner_name=owner.name, token=token)
     except Exception:
         return app.jinja(request, "error.html", message="Error loading share link.", status_code=500)
@@ -173,9 +182,9 @@ async def scan_step2(request: air.Request, token: str):
             password_hash=password_hash
         )
 
-        await DanceCardEntry.create(owner_id=owner.id, scanner_id=scanner.id)
+        await get_or_create_dance_card_entry(owner_id=owner.id, scanner_id=scanner.id)
 
-        response = app.jinja(request, "scan_step3.html", owner_name=owner.name, token=token)
+        response = app.jinja(request, "scan_step4.html", owner_name=owner.name, token=token, owner_id=owner.id)
         response.set_cookie(
             "session",
             value=create_session_cookie(str(scanner.id), SECRET_KEY),
@@ -199,10 +208,26 @@ async def scan_step3(request: air.Request, token: str, session: str = Cookie(Non
 
         owner = owner_users[0]
 
-        try:
-            await DanceCardEntry.create(owner_id=owner.id, scanner_id=scanner_id)
-        except Exception:
-            pass
+        await get_or_create_dance_card_entry(owner_id=owner.id, scanner_id=scanner_id)
+
+        return app.jinja(request, "scan_step4.html", owner_name=owner.name, token=token, owner_id=owner.id)
+    except Exception:
+        return air.RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+
+@app.post("/s/{token}/reciprocal")
+async def add_reciprocal(token: str, session: str = Cookie(None)):
+    scanner_id = get_user_id_from_session(session, SECRET_KEY) if SECRET_KEY else None
+    if not scanner_id:
+        return air.RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+
+    try:
+        owner_users = await User.filter(qr_token=token)
+        if not owner_users:
+            raise HTTPException(status_code=404, detail="Invalid QR token")
+
+        owner = owner_users[0]
+
+        await get_or_create_dance_card_entry(owner_id=scanner_id, scanner_id=owner.id)
 
         return air.RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
     except Exception:

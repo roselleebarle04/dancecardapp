@@ -7,3 +7,5 @@ Write a db mate friendly change based on the git diff - old vs new version of my
 write sql migrations 
 
 
+
+streamlit - dashboards

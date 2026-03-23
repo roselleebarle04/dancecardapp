@@ -4,6 +4,19 @@
 
 {% block content %}
 <h1>✨ Success! ✨</h1>
+{% if is_logged_in %}
+<h2>You're about to connect with {{ owner_name }}!</h2>
+
+<div class="success">
+    <p>Click below to add yourself to {{ owner_name }}'s dance card.</p>
+</div>
+
+<form method="post" action="/s/{{ token }}/add" style="margin-top: 30px;">
+    <button type="submit" style="background-color: #e94560; color: #fff; padding: 12px 30px; border: none; font-weight: bold; cursor: pointer; font-size: 16px;">
+        Add Connection
+    </button>
+</form>
+{% else %}
 <h2>You're connected with {{ owner_name }}!</h2>
 
 <div class="success">
@@ -22,6 +35,7 @@
 <a href="/dashboard" style="display: inline-block; background-color: #e94560; color: #fff; padding: 12px 30px; text-decoration: none; font-weight: bold; margin-top: 20px;">
     Go to Dashboard
 </a>
+{% endif %}
 
 <div class="link-text">
     <a href="/">Back to Home</a>
