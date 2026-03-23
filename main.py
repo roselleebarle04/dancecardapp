@@ -1,11 +1,12 @@
 import os
 import secrets
-from typing import Optional
 from fastapi import Cookie, HTTPException, status
 import air
 from dotenv import load_dotenv
-from app.auth import hash_password, verify_password, create_session_cookie, decode_session_cookie
+from app.auth import hash_password, verify_password, create_session_cookie
 from app.services import get_user_connections, get_or_create_dance_card_entry
+from app.user_service import UserService
+from app.utils import get_user_id_from_session
 
 load_dotenv()
 
@@ -13,17 +14,6 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 DOMAIN = os.getenv("DOMAIN")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 DEBUG = os.getenv("DEBUG", False)
-
-def get_user_id_from_session(session: str, secret_key: str) -> Optional[int]:
-    if not session or not secret_key:
-        return None
-    user_id_str = decode_session_cookie(session, secret_key)
-    if not user_id_str:
-        return None
-    try:
-        return int(user_id_str)
-    except (ValueError, TypeError):
-        return None
 
 app = air.Air(debug=DEBUG)
 
@@ -37,30 +27,14 @@ async def landing(request: air.Request):
 async def signup(request: air.Request):
     form_data = await request.form()
     email = form_data.get("email", "").strip()
-    name = form_data.get("name", "").strip()
-    bio = form_data.get("bio", "").strip()
-    website = form_data.get("website", "").strip()
-    linkedin_url = form_data.get("linkedin_url", "").strip()
-    password = form_data.get("password", "")
 
     try:
         existing = await User.filter(email=email)
+
         if existing:
             return app.jinja(request, "signup.html", error="This email is already registered. Try logging in?", status_code=400)
 
-        qr_token = secrets.token_urlsafe(6)[:6].upper()
-        password_hash = hash_password(password)
-
-        user = await User.create(
-            email=email,
-            name=name,
-            bio=bio or None,
-            website=website or None,
-            linkedin_url=linkedin_url or None,
-            qr_token=qr_token,
-            password_hash=password_hash
-        )
-
+        user = await UserService().create_user(email, form_data)
         response = air.RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
         response.set_cookie(
             "session",
@@ -118,6 +92,7 @@ async def dashboard(request: air.Request, session: str = Cookie(None)):
 
     try:
         user = await User.get(id=user_id)
+
         if not user:
             return air.RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
 
@@ -129,7 +104,7 @@ async def dashboard(request: air.Request, session: str = Cookie(None)):
         return air.RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
 
 @app.get("/s/{token}")
-async def scan_step1(request: air.Request, token: str, session: str = Cookie(None)):
+async def view_qr_owner_profile(request: air.Request, token: str, session: str = Cookie(None)):
     try:
         users = await User.filter(qr_token=token)
 
@@ -141,8 +116,10 @@ async def scan_step1(request: air.Request, token: str, session: str = Cookie(Non
 
         if user_id:
             entries = await DanceCardEntry.filter(owner_id=owner.id, scanner_id=user_id)
+
             if entries:
                 return app.jinja(request, "scan_step4.html", owner_name=owner.name, token=token, owner_id=owner.id)
+
             return app.jinja(request, "scan_step3.html", owner_name=owner.name, token=token, is_logged_in=True)
 
         return app.jinja(request, "scan_step1.html", owner_name=owner.name, token=token)
@@ -150,14 +127,9 @@ async def scan_step1(request: air.Request, token: str, session: str = Cookie(Non
         return app.jinja(request, "error.html", message="Error loading share link.", status_code=500)
 
 @app.post("/s/{token}")
-async def scan_step2(request: air.Request, token: str):
+async def sign_up_as_scanner(request: air.Request, token: str):
     form_data = await request.form()
     email = form_data.get("email", "").strip()
-    name = form_data.get("name", "").strip()
-    bio = form_data.get("bio", "").strip()
-    website = form_data.get("website", "").strip()
-    linkedin_url = form_data.get("linkedin_url", "").strip()
-    password = form_data.get("password", "")
 
     try:
         owner_users = await User.filter(qr_token=token)
@@ -167,21 +139,11 @@ async def scan_step2(request: air.Request, token: str):
         owner = owner_users[0]
 
         existing = await User.filter(email=email)
+
         if existing:
             return app.jinja(request, "scan_step1.html", owner_name=owner.name, token=token, error="This email is already registered.", status_code=400)
 
-        qr_token = secrets.token_urlsafe(6)[:6].upper()
-        password_hash = hash_password(password)
-
-        scanner = await User.create(
-            email=email,
-            name=name,
-            bio=bio or None,
-            website=website or None,
-            linkedin_url=linkedin_url or None,
-            qr_token=qr_token,
-            password_hash=password_hash
-        )
+        scanner = await UserService().create_user(email, form_data)
 
         await get_or_create_dance_card_entry(owner_id=owner.id, scanner_id=scanner.id)
 
@@ -197,13 +159,14 @@ async def scan_step2(request: air.Request, token: str):
         return app.jinja(request, "scan_step1.html", error="Error processing signup.", status_code=500)
 
 @app.post("/s/{token}/add")
-async def scan_step3(request: air.Request, token: str, session: str = Cookie(None)):
+async def add_owner_to_scanner_connections(request: air.Request, token: str, session: str = Cookie(None)):
     scanner_id = get_user_id_from_session(session, SECRET_KEY)
     if not scanner_id:
         return air.RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
 
     try:
         owner_users = await User.filter(qr_token=token)
+
         if not owner_users:
             raise HTTPException(status_code=404, detail="Invalid QR token")
 
@@ -215,14 +178,16 @@ async def scan_step3(request: air.Request, token: str, session: str = Cookie(Non
     except Exception:
         return air.RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
 
-@app.post("/s/{token}/reciprocal")
-async def add_reciprocal(token: str, session: str = Cookie(None)):
+@app.post("/s/{token}/add-to-my-card")
+async def add_owner_to_my_dance_card(token: str, session: str = Cookie(None)):
     scanner_id = get_user_id_from_session(session, SECRET_KEY) if SECRET_KEY else None
+
     if not scanner_id:
         return air.RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
 
     try:
         owner_users = await User.filter(qr_token=token)
+
         if not owner_users:
             raise HTTPException(status_code=404, detail="Invalid QR token")
 
