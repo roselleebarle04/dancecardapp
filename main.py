@@ -11,7 +11,7 @@ from app.utils import get_user_id_from_session
 load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
-DOMAIN = os.getenv("DOMAIN")
+DOMAIN = os.getenv("RAILWAY_PUBLIC_DOMAIN", "")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 DEBUG = os.getenv("DEBUG", False)
 
