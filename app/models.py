@@ -1,10 +1,9 @@
 from airmodel import AirModel, AirField
-from uuid import UUID
 from datetime import datetime
 from typing import Optional
 
 class User(AirModel):
-    id: Optional[UUID] = AirField(default=None, primary_key=True)
+    id: Optional[int] = AirField(default=None, primary_key=True)
     email: str
     name: str
     bio: Optional[str] = None
@@ -16,7 +15,7 @@ class User(AirModel):
     updated_at: Optional[datetime] = None
 
 class DanceCardEntry(AirModel):
-    id: Optional[UUID] = AirField(default=None, primary_key=True)
-    owner_id: UUID
-    scanner_id: UUID
+    id: Optional[int] = AirField(default=None, primary_key=True)
+    owner_id: int
+    scanner_id: int
     created_at: Optional[datetime] = None

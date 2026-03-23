@@ -12,6 +12,7 @@ dependencies = [
     "psycopg[binary]>=3.3.3",
     "python-dotenv>=1.2.2",
     "qrcode[pil]>=8.2",
+    "structlog>=25.5.0",
 ]
 
 [tool.fastapi]

@@ -2,10 +2,8 @@ import os
 import secrets
 from typing import Optional
 from fastapi import Cookie, HTTPException, status
-from uuid import UUID
 import air
 from dotenv import load_dotenv
-from app.models import User, DanceCardEntry
 from app.auth import hash_password, verify_password, create_session_cookie, decode_session_cookie
 from app.services import get_user_connections
 
@@ -15,18 +13,20 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 DOMAIN = os.getenv("DOMAIN")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
-def get_user_id_from_session(session: str, secret_key: str) -> Optional[UUID]:
+def get_user_id_from_session(session: str, secret_key: str) -> Optional[int]:
     if not session or not secret_key:
         return None
     user_id_str = decode_session_cookie(session, secret_key)
     if not user_id_str:
         return None
     try:
-        return UUID(user_id_str)
+        return int(user_id_str)
     except (ValueError, TypeError):
         return None
 
-app = air.Air()
+app = air.Air(debug=True)
+
+from app.models import User, DanceCardEntry
 
 @app.get("/")
 async def landing(request: air.Request):
@@ -68,7 +68,8 @@ async def signup(request: air.Request):
             samesite="Lax"
         )
         return response
-    except Exception:
+    except Exception as e:
+        print(e)
         return app.jinja(request, "signup.html", error="Error creating account. Please try again.", status_code=500)
 
 @app.get("/login")
@@ -110,6 +111,7 @@ async def logout():
 @app.get("/dashboard")
 async def dashboard(request: air.Request, session: str = Cookie(None)):
     user_id = get_user_id_from_session(session, SECRET_KEY)
+
     if not user_id:
         return air.RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
 
